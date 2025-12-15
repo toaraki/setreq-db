@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DJリクエストアプリ (フェーズ1)</title>
+    <style>
+        .played { text-decoration: line-through; color: gray; }
+        .unplayed { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>DJリクエスト登録</h1>
+
+    <form id="request-form">
+        <div>
+            <label for="title">曲名:</label>
+            <input type="text" id="title" name="title" required>
+        </div>
+        <div>
+            <label for="artist">アーティスト名:</label>
+            <input type="text" id="artist" name="artist" required>
+        </div>
+        <div>
+            <label for="requester_name">リクエスタ名:</label>
+            <input type="text" id="requester_name" name="requester_name" required>
+        </div>
+        <button type="submit">リクエスト送信</button>
+    </form>
+
+    <h2>リクエスト一覧</h2>
+    <ul id="request-list"></ul>
+    
+    <p id="message"></p>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000'; // ブラウザアクセス用にlocalhost:8000のまま
+
+        async function fetchRequests() {
+            try {
+                const response = await fetch(API_BASE_URL + '/requests');
+                if (!response.ok) throw new Error('APIから無効な応答');
+                
+                const requests = await response.json();
+                const list = document.getElementById('request-list');
+                list.innerHTML = ''; 
+                
+                requests.forEach(req => {
+                    const listItem = document.createElement('li');
+                    const className = req.is_played ? 'played' : 'unplayed';
+                    listItem.className = className;
+                    
+                    listItem.innerHTML = `
+                        <strong>${req.title}</strong> / ${req.artist}
+                        (リクエスタ: ${req.requester_name}) 
+                        [再生済み: ${req.is_played ? '✅' : '❌'}]
+                    `;
+                    list.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error('APIとの通信エラー:', error);
+                document.getElementById('message').textContent = 'データの取得に失敗しました。APIが起動しているか確認してください。';
+            }
+        }
+
+        // フォーム送信処理
+        document.getElementById('request-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const messageElement = document.getElementById('message');
+            messageElement.textContent = '送信中...';
+
+            const newRequest = {
+                title: form.title.value,
+                artist: form.artist.value,
+                requester_name: form.requester_name.value
+            };
+
+            try {
+                const response = await fetch(API_BASE_URL + '/requests', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newRequest)
+                });
+
+                if (response.ok) {
+                    messageElement.textContent = 'リクエストを登録しました！';
+                    form.reset();
+                    await fetchRequests(); // 登録後、一覧を更新
+                } else {
+                    const errorData = await response.json();
+                    messageElement.textContent = `リクエストの登録に失敗しました: ${errorData.detail || response.statusText}`;
+                }
+            } catch (error) {
+                console.error('POSTエラー:', error);
+                messageElement.textContent = 'APIとの通信中にエラーが発生しました。';
+            }
+        });
+
+        // ページロード時に一覧を取得
+        fetchRequests();
+    </script>
+</body>
+</html>
