@@ -43,9 +43,6 @@ spec:
       labels:
         app: dj-db
     spec:
-      # 以前遭遇した権限エラー (chmod: Operation not permitted) を回避
-      securityContext:
-        fsGroup: 26 
       containers:
       - name: db
         image: registry.redhat.io/rhel9/postgresql-15:latest
@@ -72,7 +69,7 @@ spec:
         - containerPort: 5432
         volumeMounts:
         - name: db-storage
-          mountPath: /var/lib/pgsql/data/userdata
+          mountPath: /var/lib/pgsql/data
       
       volumes:
       - name: db-storage
