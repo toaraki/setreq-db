@@ -39,15 +39,26 @@ $ podman run -d \
     registry.redhat.io/rhel9/postgresql-15
 ```
 
+## OpenShift 上での起動例
 
+### このリポジトリのクローン
 
-起動方法のメモ
-
-
-## postgresql 接続用のシークレットの作成
 ```
-oc create secret generic dj-db-secret \
-    --from-literal=POSTGRESQL_USER=djuser \
-    --from-literal=POSTGRESQL_PASSWORD=<ここに本番DBのパスワードを記述> \
-    --from-literal=POSTGRESQL_DATABASE=djdb
+$ git clone https://github.com/toaraki/setreq-db.git
+$ cd setreq-db/openshift
+```
+
+### secret-template.yamlの変更
+secret-template.yamlのdatabase-passwordに、databaseに設定するパスワードへ変更します。
+
+
+### postgresql 接続用のシークレットの作成
+```
+$ oc apply -f secret-template.yaml
+```
+
+### database の起動
+
+```
+$ oc apply -f db.yaml
 ```
