@@ -1,0 +1,67 @@
+# db-deployment-ocp.yaml
+
+# 1. 永続ボリューム要求 (PVC)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dj-db-postgres-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+# 2. データベースサービス (内部通信用)
+apiVersion: v1
+kind: Service
+metadata:
+  name: dj-db # サービス名はシンプルに変更
+  labels: {app: dj-db}
+spec:
+  selector: {app: dj-db}
+  ports:
+    - {protocol: TCP, port: 5432, targetPort: 5432}
+  type: ClusterIP
+---
+# 3. データベースのデプロイメント (Deployment)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dj-db
+  labels: {app: dj-db}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: dj-db}}
+  strategy: {type: Recreate}
+  template:
+    metadata:
+      labels: {app: dj-db}
+    spec:
+      # Step 1で作成した Red Hat レジストリからのプルSecretを参照
+      imagePullSecrets:
+        - name: redhat-pull-secret # ★ 実際のプルシークレット名に修正 ★
+      
+      # 権限エラー (Operation not permitted) を回避
+      securityContext: 
+        fsGroup: 26 
+        
+      containers:
+        - name: postgresql
+          image: registry.redhat.io/rhel9/postgresql-15:latest
+          ports:
+            - {containerPort: 5432, protocol: TCP}
+          resources: {limits: {memory: 512Mi}} # リソース制限を追加 (安定性のため)
+          
+          # ★ Secret参照に修正 ★
+          env:
+            - {name: POSTGRESQL_DATABASE, valueFrom: {secretKeyRef: {name: dj-db, key: database-name}}}
+            - {name: POSTGRESQL_USER, valueFrom: {secretKeyRef: {name: dj-db, key: database-user}}}
+            - {name: POSTGRESQL_PASSWORD, valueFrom: {secretKeyRef: {name: dj-db, key: database-password}}}
+            - {name: PGDATA, value: /var/lib/postgresql/data/userdata} # データディレクトリのパスを明示
+          
+          volumeMounts:
+            - {name: postgres-data-volume, mountPath: /var/lib/postgresql/data/userdata} # PGDATAに合わせる
+              
+      volumes:
+        - name: postgres-data-volume
+          persistentVolumeClaim: {claimName: dj-db-postgres-data}
